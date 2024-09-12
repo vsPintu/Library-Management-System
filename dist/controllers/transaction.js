@@ -62,16 +62,26 @@ export const listOfBooksByUserNameAndUserId = (req, res) => __awaiter(void 0, vo
     try {
         const { personName, userId } = req.query;
         if (!personName && !userId) {
-            res.status(400).send({
+            res.status(400).end({
                 success: false,
                 message: "Missing require field.",
             });
         }
-        const transactionByPersonNameAndUserId = yield Transaction.find();
+        const transactionByPersonNameAndUserId = yield Transaction.find({
+            $or: [
+                {
+                    personName: {
+                        $regex: personName || userId,
+                        $options: "i",
+                    },
+                },
+                { userId: { $regex: personName || userId, $options: "i" } },
+            ],
+        });
         console.log(transactionByPersonNameAndUserId);
         const listOfBooksByBookName = yield Book.find({
             bookName: transactionByPersonNameAndUserId.map((index) => index.bookName),
-        });
+        }).collation({ locale: "en", strength: 2 });
         if (!listOfBooksByBookName) {
             res.status(404).send({
                 success: false,
@@ -91,52 +101,52 @@ export const listOfBooksByUserNameAndUserId = (req, res) => __awaiter(void 0, vo
         });
     }
 });
-// export const listOfBooksByDateRange = async (
-//   req: express.Request,
-//   res: express.Response
-// ) => {
-//   try {
-//     const { minDate, maxDate } = req.query;
-//     if (!minDate || !maxDate) {
-//       res.status(400).send({
-//         success: false,
-//         message: "invalid input.",
-//       });
-//     }
-//     const transaction = await Transaction.find({
-//       issueDate: { $gte: minDate, $lte: maxDate },
-//     });
-//     const booksList = await Book.find({
-//       _id: transaction.map((index) => index.bookDetailsId),
-//     });
-//     const findTransactionByBookId = await Transaction.find({
-//       bookDetailsId: booksList.map((index) => index._id),
-//     });
-//     const user = await User.find({
-//       _id: transaction.map((index) => index.userDetailsId),
-//     });
-//     if (!booksList && !user) {
-//       res.status(404).send({
-//         success: false,
-//         message: "not found",
-//       });
-//     }
-//     const data = {
-//       booksList,
-//       user,
-//     };
-//     res.status(200).send({
-//       success: true,
-//       data,
-//     });
-//   } catch (error) {
-//     console.log(error);
-//     res.status(500).send({
-//       success: false,
-//       message: error,
-//     });
-//   }
-// };
+export const listOfBooksByDateRange = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { minDate, maxDate } = req.query;
+        if (!minDate || !maxDate) {
+            res.status(400).send({
+                success: false,
+                message: "invalid input.",
+            });
+        }
+        const transaction = yield Transaction.find({
+            issueDate: { $gte: minDate, $lte: maxDate },
+        });
+        const booksList = yield Book.find({
+            bookName: transaction.map((index) => index.bookName),
+        }).collation({ locale: "en", strength: 2 });
+        const user = yield User.find({
+            $or: [
+                { name: transaction.map((index) => index.personName || index.userId) },
+                {
+                    userId: transaction.map((index) => index.personName || index.userId),
+                },
+            ],
+        });
+        if (!booksList && !user) {
+            res.status(404).send({
+                success: false,
+                message: "not found",
+            });
+        }
+        const data = {
+            booksList,
+            user,
+        };
+        res.status(200).send({
+            success: true,
+            data,
+        });
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: error,
+        });
+    }
+});
 export const newTransaction = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { bookName, personName, userId, issueDate } = req.query;
